@@ -1,16 +1,17 @@
 package ro.mta.landmarkrecognitionapp;
 
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
@@ -23,33 +24,49 @@ import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.os.ConfigurationCompat;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
-import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 public class CameraActivity extends AppCompatActivity {
     private Executor executor = Executors.newSingleThreadExecutor();
-    private int REQUEST_CODE_PERMISSIONS = 1001;
+    private final int REQUEST_CODE_PERMISSIONS = 1001;
     private final String[] REQUIRED_PERMISSIONS = new String[]{"android.permission.CAMERA", "android.permission.WRITE_EXTERNAL_STORAGE"};
     private PreviewView previewView;
     private ImageButton cameraCaptureButton;
     private ImageButton flashlightSetButton;
+    private ImageButton photoViewButton;
     private int cameraSelectorPosition = CameraSelector.LENS_FACING_BACK;
     private int flashMode = ImageCapture.FLASH_MODE_AUTO;
     private String unrecognizedImagesDirLocation;
     private String recognizedImagesDirLocation;
+    @DrawableRes
+    int[] flashIconSet = {R.drawable.baseline_flash_auto_24, R.drawable.baseline_flash_on_24, R.drawable.baseline_flash_off_24};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
+
+        int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        this.getWindow().getDecorView().setSystemUiVisibility(uiOptions);
+
         unrecognizedImagesDirLocation = getFilesDir().getPath() + "/Unrecognized Images";
         recognizedImagesDirLocation = getFilesDir().getPath() + "/Recognized Images";
         File unrecognizedImagesDir = new File(unrecognizedImagesDirLocation);
@@ -58,22 +75,32 @@ public class CameraActivity extends AppCompatActivity {
             unrecognizedImagesDir.mkdirs();
         if (!recognizedImagesDir.exists())
             recognizedImagesDir.mkdirs();
+
         previewView = findViewById(R.id.previewView);
+
         cameraCaptureButton = findViewById(R.id.camera_capture_button);
         ImageButton cameraSwitchButton = findViewById(R.id.camera_switch_button);
         cameraSwitchButton.setOnClickListener(view -> {
-            cameraSelectorPosition = 1 - cameraSelectorPosition;
+            cameraSelectorPosition ^= 1;
             startCamera();
         });
+
         flashlightSetButton = findViewById(R.id.flashlight_set);
+        flashlightSetButton.setImageResource(flashIconSet[flashMode]);
         flashlightSetButton.setOnClickListener(view -> {
             flashMode = (flashMode + 1) % 3;
-            if (flashMode == ImageCapture.FLASH_MODE_AUTO)
-                flashlightSetButton.setImageResource(R.drawable.baseline_flash_auto_24);
-            else if (flashMode == ImageCapture.FLASH_MODE_ON)
-                flashlightSetButton.setImageResource(R.drawable.baseline_flash_on_24);
-            else if (flashMode == ImageCapture.FLASH_MODE_OFF)
-                flashlightSetButton.setImageResource(R.drawable.baseline_flash_off_24);
+            flashlightSetButton.setImageResource(flashIconSet[flashMode]);
+        });
+
+        photoViewButton = findViewById(R.id.photo_view_button);
+        String lastImagePath = getLastImagePath(unrecognizedImagesDirLocation);
+        if (lastImagePath != null) setGalleryThumbnail(lastImagePath);
+        photoViewButton.setOnClickListener(view -> {
+            String lastImagePath1 = getLastImagePath(unrecognizedImagesDirLocation);
+            if (lastImagePath1 != null)
+                startActivity(new Intent(getApplicationContext(), ViewPhotoUnrecognizedActivity.class));
+            else
+                Toast.makeText(CameraActivity.this, "There are no images!", Toast.LENGTH_SHORT).show();
         });
         if (allPermissionsGranted()) {
             startCamera();
@@ -114,14 +141,17 @@ public class CameraActivity extends AppCompatActivity {
         cameraProvider.unbindAll();
         Camera camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis, imageCapture);
         cameraCaptureButton.setOnClickListener(view -> {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US);
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", ConfigurationCompat.getLocales(getResources().getConfiguration()).get(0));
             File file = new File(unrecognizedImagesDirLocation, dateFormat.format(new Date()) + ".jpg");
             ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
             imageCapture.setFlashMode(flashMode);
             imageCapture.takePicture(outputFileOptions, executor, new ImageCapture.OnImageSavedCallback() {
                 @Override
                 public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
-                    new Handler(Looper.getMainLooper()).post(() -> Toast.makeText(CameraActivity.this, "Image Saved Succesfully to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show());
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        Toast.makeText(CameraActivity.this, "Image Saved Succesfully to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                        setGalleryThumbnail(file.getAbsolutePath());
+                    });
                 }
 
                 @Override
@@ -141,6 +171,24 @@ public class CameraActivity extends AppCompatActivity {
         return true;
     }
 
+    private void setGalleryThumbnail(String imagePath) {
+        int padding = getResources().getDimensionPixelOffset(R.dimen.stroke_small);
+        photoViewButton.setPadding(padding, padding, padding, padding);
+        Glide.with(photoViewButton).load(imagePath).apply(RequestOptions.circleCropTransform()).into(photoViewButton);
+    }
+
+    @Nullable
+    private String getLastImagePath(String imageFolderPath) {
+        File unrecognizedImagesDir = new File(imageFolderPath);
+        File[] unrecognizedImagesList = unrecognizedImagesDir.listFiles();
+        if (unrecognizedImagesList != null && unrecognizedImagesList.length > 1)
+            Arrays.sort(unrecognizedImagesList, Comparator.comparing(File::getName));
+        assert unrecognizedImagesList != null;
+        if (unrecognizedImagesList.length > 0)
+            return unrecognizedImagesList[unrecognizedImagesList.length - 1].getAbsolutePath();
+        return null;
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -151,6 +199,20 @@ public class CameraActivity extends AppCompatActivity {
                 Toast.makeText(this, "Permissions not granted by the user.", Toast.LENGTH_SHORT).show();
                 this.finish();
             }
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        String lastImagePath = getLastImagePath(unrecognizedImagesDirLocation);
+        if (lastImagePath != null)
+            setGalleryThumbnail(lastImagePath);
+        else
+        {
+            int padding = getResources().getDimensionPixelOffset(R.dimen.spacing_large);
+            photoViewButton.setPadding(padding, padding, padding, padding);
+            photoViewButton.setImageResource(R.drawable.ic_photo);
         }
     }
 }
