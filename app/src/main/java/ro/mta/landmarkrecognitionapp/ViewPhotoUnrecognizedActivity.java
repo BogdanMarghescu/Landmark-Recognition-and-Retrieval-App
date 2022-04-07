@@ -12,6 +12,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.viewpager2.widget.ViewPager2;
 
+import com.google.android.material.button.MaterialButton;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +25,7 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
     ArrayList<String> unrecognizedImagesList;
     private ImageButton deleteButton;
     private ImageButton shareImage;
+    private MaterialButton recognizeImageButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,7 +43,9 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
             unrecognizedImagesList.sort(String::compareTo);
         unrecognizedViewPager = new UnrecognizedViewPager(unrecognizedImagesList, this);
         viewPager.setAdapter(unrecognizedViewPager);
-        viewPager.setCurrentItem(unrecognizedViewPager.getItemCount() - 1);
+
+        Intent intent = getIntent();
+        viewPager.setCurrentItem(intent.getIntExtra("position", unrecognizedViewPager.getItemCount() - 1));
 
         deleteButton = findViewById(R.id.delete_button);
         deleteButton.setOnClickListener(view -> {
@@ -51,19 +56,15 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
             builder.setPositiveButton(android.R.string.yes,
                     (dialog, which) -> {
                         int pos = viewPager.getCurrentItem();
-                        if(pos==0)
-                        {
-                            if(unrecognizedImagesList.size() == 1)
-                            {
+                        if (pos == 0) {
+                            if (unrecognizedImagesList.size() == 1) {
                                 deleteFile(pos);
                                 finish();
-                            }
-                            else {
+                            } else {
                                 viewPager.setCurrentItem(pos + 1);
                                 deleteFile(pos);
                             }
-                        }
-                        else {
+                        } else {
                             viewPager.setCurrentItem(pos - 1);
                             deleteFile(pos);
                         }
@@ -90,9 +91,14 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
             }
             startActivity(chooser);
         });
+
+        recognizeImageButton = findViewById(R.id.recognize_image_button);
+        recognizeImageButton.setOnClickListener(view -> {
+            //TO DO
+        });
     }
 
-    private void deleteFile(int pos){
+    private void deleteFile(int pos) {
         new File(unrecognizedImagesList.get(pos)).getAbsoluteFile().delete();
         unrecognizedImagesList.remove(pos);
         unrecognizedViewPager.notifyItemRemoved(pos);
