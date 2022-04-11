@@ -11,8 +11,8 @@
         android:layout_height="match_parent"
         android:columnWidth="80dp"
         android:gravity="center"
-        android:horizontalSpacing="8dp"
+        android:horizontalSpacing="10dp"
         android:numColumns="auto_fit"
         android:stretchMode="columnWidth"
-        android:verticalSpacing="8dp" />
+        android:verticalSpacing="10dp" />
 </FrameLayout>

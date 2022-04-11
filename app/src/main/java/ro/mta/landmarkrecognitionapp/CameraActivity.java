@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
@@ -50,7 +52,7 @@ public class CameraActivity extends AppCompatActivity {
     private int cameraSelectorPosition = CameraSelector.LENS_FACING_BACK;
     private int flashMode = ImageCapture.FLASH_MODE_AUTO;
     private String unrecognizedImagesDirLocation;
-    private String recognizedImagesDirLocation;
+    private LandmarkRecognitionDatabase landmarkRecognitionDatabase;
     @DrawableRes
     int[] flashIconSet = {R.drawable.baseline_flash_auto_24, R.drawable.baseline_flash_on_24, R.drawable.baseline_flash_off_24};
 
@@ -58,24 +60,10 @@ public class CameraActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
-
-        int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-        this.getWindow().getDecorView().setSystemUiVisibility(uiOptions);
-
+        Window w = getWindow(); // in Activity's onCreate() for instance
+        w.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         unrecognizedImagesDirLocation = getFilesDir().getPath() + "/Unrecognized Images";
-        recognizedImagesDirLocation = getFilesDir().getPath() + "/Recognized Images";
-        File unrecognizedImagesDir = new File(unrecognizedImagesDirLocation);
-        File recognizedImagesDir = new File(recognizedImagesDirLocation);
-        if (!unrecognizedImagesDir.exists())
-            unrecognizedImagesDir.mkdirs();
-        if (!recognizedImagesDir.exists())
-            recognizedImagesDir.mkdirs();
-
+        landmarkRecognitionDatabase = LandmarkRecognitionDatabase.getInstance(this);
         previewView = findViewById(R.id.previewView);
 
         cameraCaptureButton = findViewById(R.id.camera_capture_button);
@@ -149,7 +137,10 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
                     new Handler(Looper.getMainLooper()).post(() -> {
-                        Toast.makeText(CameraActivity.this, "Image Saved Succesfully to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                        UnrecognizedImages newImage = new UnrecognizedImages(file.getAbsolutePath());
+                        if (landmarkRecognitionDatabase.unrecognizedImagesDao().getCountByPath(file.getAbsolutePath()) == 0)
+                            landmarkRecognitionDatabase.unrecognizedImagesDao().insertUnrecognizedImages(newImage);
+                        Toast.makeText(CameraActivity.this, "Image Saved Succesfully as " + file.getName(), Toast.LENGTH_SHORT).show();
                         setGalleryThumbnail(file.getAbsolutePath());
                     });
                 }
@@ -208,8 +199,7 @@ public class CameraActivity extends AppCompatActivity {
         String lastImagePath = getLastImagePath(unrecognizedImagesDirLocation);
         if (lastImagePath != null)
             setGalleryThumbnail(lastImagePath);
-        else
-        {
+        else {
             int padding = getResources().getDimensionPixelOffset(R.dimen.spacing_large);
             photoViewButton.setPadding(padding, padding, padding, padding);
             photoViewButton.setImageResource(R.drawable.ic_photo);

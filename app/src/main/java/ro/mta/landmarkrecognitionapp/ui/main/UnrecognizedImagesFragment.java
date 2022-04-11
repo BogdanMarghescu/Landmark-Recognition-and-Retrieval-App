@@ -11,14 +11,14 @@ import androidx.fragment.app.Fragment;
 import java.io.File;
 import java.util.ArrayList;
 
-import ro.mta.landmarkrecognitionapp.UnrecognizedImageAdapter;
+import ro.mta.landmarkrecognitionapp.GalleryUnrecognizedImageAdapter;
 import ro.mta.landmarkrecognitionapp.R;
 
 public class UnrecognizedImagesFragment extends Fragment {
     private GridView imageGrid;
     private ArrayList<String> unrecognizedImagesList;
     private String unrecognizedImagesDirLocation;
-    private UnrecognizedImageAdapter unrecognizedImageAdapter;
+    private GalleryUnrecognizedImageAdapter galleryUnrecognizedImageAdapter;
 
     public UnrecognizedImagesFragment() {
         // Required empty public constructor
@@ -47,8 +47,17 @@ public class UnrecognizedImagesFragment extends Fragment {
         }
         if (unrecognizedImagesList.size() > 1)
             unrecognizedImagesList.sort(String::compareTo);
-        unrecognizedImageAdapter = new UnrecognizedImageAdapter(requireContext(), unrecognizedImagesList);
-        imageGrid.setAdapter(unrecognizedImageAdapter);
+        galleryUnrecognizedImageAdapter = new GalleryUnrecognizedImageAdapter(requireContext(), unrecognizedImagesList);
+        imageGrid.setAdapter(galleryUnrecognizedImageAdapter);
         return view;
+    }
+
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+        if (isVisibleToUser) {
+            assert getFragmentManager() != null;
+            getFragmentManager().beginTransaction().detach(this).attach(this).commit();
+        }
     }
 }

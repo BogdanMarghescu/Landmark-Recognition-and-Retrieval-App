@@ -11,6 +11,8 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
+import java.io.File;
+
 import ro.mta.landmarkrecognitionapp.ui.main.SectionsPagerAdapter;
 
 public class MainActivity extends AppCompatActivity {
@@ -19,12 +21,22 @@ public class MainActivity extends AppCompatActivity {
     ViewPager2 viewPager;
     TabLayout tabs;
     SectionsPagerAdapter sectionsPagerAdapter;
+    private String unrecognizedImagesDirLocation;
+    private String recognizedImagesDirLocation;
     boolean pauseFlag = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        unrecognizedImagesDirLocation = getFilesDir().getPath() + "/Unrecognized Images";
+        recognizedImagesDirLocation = getFilesDir().getPath() + "/Recognized Images";
+        File unrecognizedImagesDir = new File(unrecognizedImagesDirLocation);
+        File recognizedImagesDir = new File(recognizedImagesDirLocation);
+        if (!unrecognizedImagesDir.exists())
+            unrecognizedImagesDir.mkdirs();
+        if (!recognizedImagesDir.exists())
+            recognizedImagesDir.mkdirs();
         sectionsPagerAdapter = new SectionsPagerAdapter(this);
         viewPager = findViewById(R.id.view_pager_galleries);
         viewPager.setAdapter(sectionsPagerAdapter);

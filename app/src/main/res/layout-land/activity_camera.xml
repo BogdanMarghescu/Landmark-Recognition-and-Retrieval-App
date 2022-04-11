@@ -18,25 +18,25 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.0">
 
-        <ImageButton
-            android:id="@+id/flashlight_set"
-            android:layout_width="@dimen/round_button_medium"
-            android:layout_height="@dimen/round_button_medium"
-            android:layout_marginStart="@dimen/spacing_medium"
-            android:layout_marginTop="@dimen/spacing_medium"
-            android:layout_marginEnd="@dimen/spacing_medium"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/flash_set"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/baseline_flash_auto_24" />
     </androidx.camera.view.PreviewView>
+
+    <ImageButton
+        android:id="@+id/flashlight_set"
+        android:layout_width="@dimen/round_button_medium"
+        android:layout_height="@dimen/round_button_medium"
+        android:layout_marginStart="@dimen/spacing_large"
+        android:layout_marginTop="@dimen/spacing_large"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/flash_set"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@drawable/baseline_flash_auto_24" />
 
     <ImageButton
         android:id="@+id/camera_switch_button"
         android:layout_width="@dimen/round_button_medium"
         android:layout_height="@dimen/round_button_medium"
-        android:layout_marginEnd="@dimen/margin_medium"
+        android:layout_marginEnd="62dp"
         android:layout_marginBottom="@dimen/margin_small"
         android:background="@android:color/transparent"
         android:contentDescription="@string/switch_camera_button_alt"
@@ -51,7 +51,7 @@
         android:layout_width="@dimen/round_button_medium"
         android:layout_height="@dimen/round_button_medium"
         android:layout_marginTop="@dimen/margin_small"
-        android:layout_marginEnd="@dimen/margin_medium"
+        android:layout_marginEnd="62dp"
         android:background="@drawable/ic_outer_circle"
         android:contentDescription="@string/gallery_button_alt"
         android:padding="@dimen/spacing_large"
@@ -64,7 +64,7 @@
         android:id="@+id/camera_capture_button"
         android:layout_width="@dimen/round_button_large"
         android:layout_height="@dimen/round_button_large"
-        android:layout_marginEnd="@dimen/shutter_button_margin"
+        android:layout_marginEnd="@dimen/margin_medium"
         android:background="@drawable/ic_shutter"
         android:contentDescription="@string/capture_button_alt"
         android:scaleType="fitCenter"
