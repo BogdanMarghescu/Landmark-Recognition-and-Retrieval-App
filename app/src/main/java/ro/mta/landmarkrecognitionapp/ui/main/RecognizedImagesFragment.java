@@ -52,6 +52,8 @@ public class RecognizedImagesFragment extends Fragment {
         return view;
     }
 
+
+
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);

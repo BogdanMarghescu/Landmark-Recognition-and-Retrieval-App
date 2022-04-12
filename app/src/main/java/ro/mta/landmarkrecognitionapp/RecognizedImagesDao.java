@@ -20,6 +20,15 @@ public interface RecognizedImagesDao {
     @Query("SELECT * FROM recognized_images WHERE path = :myPath")
     RecognizedImages getImageByPath(String myPath);
 
+    @Query("SELECT * FROM recognized_images WHERE country = :myCountry")
+    List<RecognizedImages> getImagesByCountry(String myCountry);
+
+    @Query("SELECT * FROM recognized_images WHERE locality = :myLocality")
+    List<RecognizedImages> getImagesByLocality(String myLocality);
+
+    @Query("SELECT * FROM recognized_images WHERE landmark_name = :myLandmarkName")
+    List<RecognizedImages> getImagesByLandmark(String myLandmarkName);
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertRecognizedImages(RecognizedImages recognizedImages);
 

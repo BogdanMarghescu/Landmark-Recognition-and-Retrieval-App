@@ -6,7 +6,6 @@ import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.widget.ImageButton;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -39,17 +38,23 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
         File recognizedImagesDir = new File(recognizedImagesDirLocation);
         File[] files = recognizedImagesDir.listFiles();
         recognizedImagesList = new ArrayList<>();
-        assert files != null;
-        for (File file : files) {
-            recognizedImagesList.add(file.getAbsolutePath());
-        }
-        if (recognizedImagesList.size() > 1)
-            recognizedImagesList.sort(String::compareTo);
-        imageViewPager = new ImageViewPager(recognizedImagesList, this);
-        viewPager.setAdapter(imageViewPager);
-
         Intent intent = getIntent();
-        viewPager.setCurrentItem(intent.getIntExtra("position", imageViewPager.getItemCount() - 1));
+        if (intent.hasExtra("image_list")) {
+            recognizedImagesList = (ArrayList<String>) getIntent().getSerializableExtra("image_list");
+            imageViewPager = new ImageViewPager(recognizedImagesList, this);
+            viewPager.setAdapter(imageViewPager);
+            viewPager.setCurrentItem(0);
+        } else {
+            assert files != null;
+            for (File file : files) {
+                recognizedImagesList.add(file.getAbsolutePath());
+            }
+            if (recognizedImagesList.size() > 1)
+                recognizedImagesList.sort(String::compareTo);
+            imageViewPager = new ImageViewPager(recognizedImagesList, this);
+            viewPager.setAdapter(imageViewPager);
+            viewPager.setCurrentItem(intent.getIntExtra("position", imageViewPager.getItemCount() - 1));
+        }
 
         deleteButton = findViewById(R.id.delete_button_rec);
         deleteButton.setOnClickListener(view -> {
@@ -101,12 +106,30 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             int pos = viewPager.getCurrentItem();
             RecognizedImages image = landmarkRecognitionDatabase.recognizedImagesDao().getImageByPath(recognizedImagesList.get(pos));
             File file = new File(recognizedImagesList.get(pos));
-            Toast.makeText(this, "Image " + file.getName() +
-                    "\nLandmark Name: " + image.getLandmarkName() +
-                    "\nLandmark Country: " + image.getCountry() +
-                    "\nLandmark Locality: " + image.getLocality() +
-                    "\nLandmark Latitude: " + image.getLatitude() +
-                    "\nLandmark Longitude: " + image.getLongitude(), Toast.LENGTH_SHORT).show();
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setCancelable(true);
+            builder.setTitle("Image " + file.getName() + " details:");
+            builder.setMessage("Landmark Name: " + image.getLandmarkName() +
+                    "\nCountry: " + image.getCountry() +
+                    "\nLocality: " + image.getLocality() +
+                    "\nLatitude: " + image.getLatitude() +
+                    "\nLongitude: " + image.getLongitude());
+            if(intent.hasExtra("image_list")){
+                builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                }).setIcon(android.R.drawable.ic_dialog_alert);
+            }
+            else{
+                builder.setPositiveButton(R.string.locate_on_map,
+                        (dialog, which) -> {
+                            Intent intentMap = new Intent(getApplicationContext(), MapsActivity.class);
+                            intentMap.putExtra("landmark", image);
+                            startActivity(intentMap);
+                        });
+                builder.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
+                }).setIcon(android.R.drawable.ic_dialog_alert);
+            }
+            AlertDialog dialog = builder.create();
+            dialog.show();
         });
     }
 
