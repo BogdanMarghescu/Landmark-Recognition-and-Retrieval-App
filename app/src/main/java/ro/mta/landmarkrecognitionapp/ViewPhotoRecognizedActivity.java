@@ -1,11 +1,13 @@
 package ro.mta.landmarkrecognitionapp;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.widget.ImageButton;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -25,8 +27,10 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
     ArrayList<String> recognizedImagesList;
     private ImageButton deleteButton;
     private ImageButton shareImage;
+    private ImageButton favoriteButton;
     private MaterialButton detailsImageButton;
     private LandmarkRecognitionDatabase landmarkRecognitionDatabase;
+    private SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +59,7 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             viewPager.setAdapter(imageViewPager);
             viewPager.setCurrentItem(intent.getIntExtra("position", imageViewPager.getItemCount() - 1));
         }
+        sharedPreferences = getSharedPreferences("sharedPref", MODE_PRIVATE);
 
         deleteButton = findViewById(R.id.delete_button_rec);
         deleteButton.setOnClickListener(view -> {
@@ -114,11 +119,10 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
                     "\nLocality: " + image.getLocality() +
                     "\nLatitude: " + image.getLatitude() +
                     "\nLongitude: " + image.getLongitude());
-            if(intent.hasExtra("image_list")){
+            if (intent.hasExtra("image_list")) {
                 builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
                 }).setIcon(android.R.drawable.ic_dialog_alert);
-            }
-            else{
+            } else {
                 builder.setPositiveButton(R.string.locate_on_map,
                         (dialog, which) -> {
                             Intent intentMap = new Intent(getApplicationContext(), MapsActivity.class);
@@ -131,13 +135,43 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             AlertDialog dialog = builder.create();
             dialog.show();
         });
+
+        favoriteButton = findViewById(R.id.favoriteButton);
+        setFavoriteIcon();
+        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                setFavoriteIcon();
+                super.onPageSelected(position);
+            }
+        });
+        favoriteButton.setOnClickListener(view -> {
+            int pos = viewPager.getCurrentItem();
+            boolean isFavorite = sharedPreferences.getBoolean(recognizedImagesList.get(viewPager.getCurrentItem()), false);
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putBoolean(recognizedImagesList.get(pos), !isFavorite);
+            editor.apply();
+            if(isFavorite) Toast.makeText(this, "Image " + new File(recognizedImagesList.get(pos)).getName() + " removed from favorites", Toast.LENGTH_SHORT).show();
+            else Toast.makeText(this, "Image " + new File(recognizedImagesList.get(pos)).getName() + " added to favorites", Toast.LENGTH_SHORT).show();
+            setFavoriteIcon();
+            sharedPreferences.getBoolean(recognizedImagesList.get(viewPager.getCurrentItem()), false);
+        });
     }
 
     private void deleteFile(int pos) {
         RecognizedImages imageToBeDeleted = landmarkRecognitionDatabase.recognizedImagesDao().getImageByPath(recognizedImagesList.get(pos));
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.remove(imageToBeDeleted.getPath());
+        editor.apply();
         landmarkRecognitionDatabase.recognizedImagesDao().deleteRecognizedImages(imageToBeDeleted);
         new File(recognizedImagesList.get(pos)).getAbsoluteFile().delete();
         recognizedImagesList.remove(pos);
         imageViewPager.notifyItemRemoved(pos);
+    }
+
+    private void setFavoriteIcon() {
+        boolean isFavorite = sharedPreferences.getBoolean(recognizedImagesList.get(viewPager.getCurrentItem()), false);
+        if (isFavorite) favoriteButton.setImageResource(R.drawable.baseline_favorite_24);
+        else favoriteButton.setImageResource(R.drawable.baseline_favorite_border_24);
     }
 }

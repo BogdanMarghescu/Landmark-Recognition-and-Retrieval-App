@@ -1,6 +1,7 @@
 package ro.mta.landmarkrecognitionapp;
 
 import android.annotation.SuppressLint;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
@@ -9,6 +10,7 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.annotation.StringRes;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -82,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.item1:
-                Toast.makeText(this, "Item 1 selected", Toast.LENGTH_SHORT).show();
+                showAlertDialog();
                 return true;
             case R.id.item2:
                 Intent intent = new Intent(getApplicationContext(), MapsActivity.class);
@@ -91,5 +93,37 @@ public class MainActivity extends AppCompatActivity {
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    private void showAlertDialog() {
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
+        alertDialog.setTitle("Sort Images by:");
+        String[] items = {"Date", "Country", "Locality", "Landmark", "Favorites"};
+        int checkedItem = 0;
+        alertDialog.setSingleChoiceItems(items, checkedItem, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                switch (which) {
+                    case 0:
+                        Toast.makeText(MainActivity.this, "Clicked on Date", Toast.LENGTH_SHORT).show();
+                        break;
+                    case 1:
+                        Toast.makeText(MainActivity.this, "Clicked on Country", Toast.LENGTH_SHORT).show();
+                        break;
+                    case 2:
+                        Toast.makeText(MainActivity.this, "Clicked on Locality", Toast.LENGTH_SHORT).show();
+                        break;
+                    case 3:
+                        Toast.makeText(MainActivity.this, "Clicked on Landmark", Toast.LENGTH_SHORT).show();
+                        break;
+                    case 4:
+                        Toast.makeText(MainActivity.this, "Clicked on Favorites", Toast.LENGTH_SHORT).show();
+                        break;
+                }
+            }
+        });
+        AlertDialog alert = alertDialog.create();
+        alert.setCanceledOnTouchOutside(false);
+        alert.show();
     }
 }
