@@ -14,6 +14,9 @@ public interface RecognizedImagesDao {
     @Query("SELECT * FROM recognized_images")
     List<RecognizedImages> getRecognizedImagesList();
 
+    @Query("SELECT COUNT(*) FROM recognized_images")
+    int getCount();
+
     @Query("SELECT COUNT(*) FROM recognized_images WHERE path = :myPath")
     int getCountByPath(String myPath);
 

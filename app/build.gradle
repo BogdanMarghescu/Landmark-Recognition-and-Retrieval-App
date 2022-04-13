@@ -68,4 +68,9 @@ dependencies {
     annotationProcessor "androidx.room:room-compiler:$room_version"
 
 
+// For Card view
+    implementation 'androidx.cardview:cardview:1.0.0'
+
+// Chart and graph library
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.0.3'
 }

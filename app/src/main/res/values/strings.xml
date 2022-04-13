@@ -24,4 +24,6 @@
     <string name="title_activity_maps">MapsActivity</string>
     <string name="locate_on_map">Locate</string>
     <string name="api_key">AIzaSyBKeAxMiBfyRUwDUB8f5SOpr7F8RoOSMyI</string>
+    <string name="number_of_images_by_recognition">Number of images by recognition</string>
+    <string name="number_of_favorite_images">Number of favorite images</string>
 </resources>
