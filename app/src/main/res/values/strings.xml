@@ -23,12 +23,9 @@
     <string name="locate_images">Locate Images</string>
     <string name="title_activity_maps">MapsActivity</string>
     <string name="locate_on_map">Locate</string>
-    <string name="api_key">AIzaSyBKeAxMiBfyRUwDUB8f5SOpr7F8RoOSMyI</string>
     <string name="number_of_images_by_recognition">Number of images by recognition</string>
     <string name="number_of_favorite_images">Number of favorite images</string>
     <string name="number_of_images_per_country">Number of images per country</string>
     <string name="number_of_images_per_locality">Number of images per locality</string>
     <string name="number_of_images_per_landmark">Number of images per landmark</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
