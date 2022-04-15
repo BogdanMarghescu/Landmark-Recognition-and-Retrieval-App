@@ -1,13 +1,12 @@
 package ro.mta.landmarkrecognitionapp;
 
 import android.annotation.SuppressLint;
-import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
@@ -19,6 +18,8 @@ import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 
 import ro.mta.landmarkrecognitionapp.ui.main.SectionsPagerAdapter;
 
@@ -30,7 +31,8 @@ public class MainActivity extends AppCompatActivity {
     SectionsPagerAdapter sectionsPagerAdapter;
     private String unrecognizedImagesDirLocation;
     private String recognizedImagesDirLocation;
-    boolean pauseFlag = false;
+    private boolean pauseFlag = false;
+    private SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +46,12 @@ public class MainActivity extends AppCompatActivity {
             unrecognizedImagesDir.mkdirs();
         if (!recognizedImagesDir.exists())
             recognizedImagesDir.mkdirs();
+        sharedPreferences = getSharedPreferences("sharedPref", MODE_PRIVATE);
+        if (!sharedPreferences.contains("Sort Type")) {
+            @SuppressLint("CommitPrefEdits") SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putString("Sort Type", "Date");
+            editor.apply();
+        }
         sectionsPagerAdapter = new SectionsPagerAdapter(this);
         viewPager = findViewById(R.id.view_pager_galleries);
         viewPager.setAdapter(sectionsPagerAdapter);
@@ -55,6 +63,11 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
         setSupportActionBar(findViewById(R.id.toolbar));
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
     }
 
     @Override
@@ -99,28 +112,14 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
         alertDialog.setTitle("Sort Images by:");
         String[] items = {"Date", "Country", "Locality", "Landmark", "Favorites"};
-        int checkedItem = 0;
-        alertDialog.setSingleChoiceItems(items, checkedItem, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                switch (which) {
-                    case 0:
-                        Toast.makeText(MainActivity.this, "Clicked on Date", Toast.LENGTH_SHORT).show();
-                        break;
-                    case 1:
-                        Toast.makeText(MainActivity.this, "Clicked on Country", Toast.LENGTH_SHORT).show();
-                        break;
-                    case 2:
-                        Toast.makeText(MainActivity.this, "Clicked on Locality", Toast.LENGTH_SHORT).show();
-                        break;
-                    case 3:
-                        Toast.makeText(MainActivity.this, "Clicked on Landmark", Toast.LENGTH_SHORT).show();
-                        break;
-                    case 4:
-                        Toast.makeText(MainActivity.this, "Clicked on Favorites", Toast.LENGTH_SHORT).show();
-                        break;
-                }
-            }
+        List<Object> stringArrayList = Arrays.asList(items);
+        int checkedItem = stringArrayList.indexOf(sharedPreferences.getString("Sort Type", "Date"));
+        @SuppressLint("CommitPrefEdits") SharedPreferences.Editor editor = sharedPreferences.edit();
+        alertDialog.setSingleChoiceItems(items, checkedItem, (dialog, which) -> {
+            editor.putString("Sort Type", items[which]);
+            editor.apply();
+            recreate();
+            viewPager.setCurrentItem(0);
         });
         AlertDialog alert = alertDialog.create();
         alert.setCanceledOnTouchOutside(false);

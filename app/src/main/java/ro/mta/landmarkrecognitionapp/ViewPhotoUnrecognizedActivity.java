@@ -24,7 +24,6 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.MediaType;
@@ -36,38 +35,26 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
-    private String unrecognizedImagesDirLocation;
-    private String recognizedImagesDirLocation;
-    private ImageViewPager imageViewPager;
+    private List<UnrecognizedImages> unrecognizedImagesList;
+    private LandmarkRecognitionDatabase landmarkRecognitionDatabase;
+    private UnrecognizedImageViewPager unrecognizedImageViewPager;
     private ViewPager2 viewPager;
-    ArrayList<String> unrecognizedImagesList;
     private ImageButton deleteButton;
     private ImageButton shareImage;
     private MaterialButton recognizeImageButton;
-    private LandmarkRecognitionDatabase landmarkRecognitionDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_view_photo_unrecognized);
-        unrecognizedImagesDirLocation = getFilesDir().getPath() + "/Unrecognized Images";
-        recognizedImagesDirLocation = getFilesDir().getPath() + "/Recognized Images";
         landmarkRecognitionDatabase = LandmarkRecognitionDatabase.getInstance(this);
         viewPager = findViewById(R.id.photo_view_pager);
-        File unrecognizedImagesDir = new File(unrecognizedImagesDirLocation);
-        File[] files = unrecognizedImagesDir.listFiles();
-        unrecognizedImagesList = new ArrayList<>();
-        assert files != null;
-        for (File file : files) {
-            unrecognizedImagesList.add(file.getAbsolutePath());
-        }
-        if (unrecognizedImagesList.size() > 1)
-            unrecognizedImagesList.sort(String::compareTo);
-        imageViewPager = new ImageViewPager(unrecognizedImagesList, this);
-        viewPager.setAdapter(imageViewPager);
+        unrecognizedImagesList = landmarkRecognitionDatabase.unrecognizedImagesDao().getUnrecognizedImagesList();
+        unrecognizedImageViewPager = new UnrecognizedImageViewPager(unrecognizedImagesList, this);
+        viewPager.setAdapter(unrecognizedImageViewPager);
 
         Intent intent = getIntent();
-        viewPager.setCurrentItem(intent.getIntExtra("position", imageViewPager.getItemCount() - 1));
+        viewPager.setCurrentItem(intent.getIntExtra("position", unrecognizedImageViewPager.getItemCount() - 1));
 
         deleteButton = findViewById(R.id.delete_button);
         deleteButton.setOnClickListener(view -> {
@@ -99,7 +86,7 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
 
         shareImage = findViewById(R.id.share_button);
         shareImage.setOnClickListener(view -> {
-            Uri uriToImage = FileProvider.getUriForFile(this, "ro.mta.landmarkrecognitionapp.provider", new File(unrecognizedImagesList.get(viewPager.getCurrentItem())));
+            Uri uriToImage = FileProvider.getUriForFile(this, "ro.mta.landmarkrecognitionapp.provider", new File(unrecognizedImagesList.get(viewPager.getCurrentItem()).getPath()));
             Intent shareIntent = new Intent();
             shareIntent.setAction(Intent.ACTION_SEND);
             shareIntent.putExtra(Intent.EXTRA_STREAM, uriToImage);
@@ -117,8 +104,8 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
         recognizeImageButton = findViewById(R.id.recognize_image_button);
         recognizeImageButton.setOnClickListener(view -> {
             int pos = viewPager.getCurrentItem();
-            File imageToUpload = new File(unrecognizedImagesList.get(pos)).getAbsoluteFile();
-            Uri uriToImage = FileProvider.getUriForFile(this, "ro.mta.landmarkrecognitionapp.provider", new File(unrecognizedImagesList.get(viewPager.getCurrentItem())));
+            File imageToUpload = new File(unrecognizedImagesList.get(pos).getPath()).getAbsoluteFile();
+            Uri uriToImage = FileProvider.getUriForFile(this, "ro.mta.landmarkrecognitionapp.provider", new File(unrecognizedImagesList.get(viewPager.getCurrentItem()).getPath()));
             Uploader uploader = NetworkClient.getRetrofit(this).create(Uploader.class);
             RequestBody requestFile = RequestBody.create(MediaType.parse(getContentResolver().getType(uriToImage)), imageToUpload);
             MultipartBody.Part body = MultipartBody.Part.createFormData("picture", imageToUpload.getName(), requestFile);
@@ -157,7 +144,7 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
                                     "\nLandmark Longitude: " + longitude, Toast.LENGTH_SHORT).show();
                             String imageToUploadName = imageToUpload.getName();
                             imageToUploadName = imageToUploadName.substring(0, imageToUploadName.lastIndexOf("."));
-                            File fileToUpload = new File(recognizedImagesDirLocation, imageToUpload.getName());
+                            File fileToUpload = new File(getFilesDir().getPath() + "/Recognized Images", imageToUpload.getName());
                             imageToUpload.renameTo(fileToUpload);
                             RecognizedImages recognizedImage = new RecognizedImages(fileToUpload.getAbsolutePath(), landmarkName, imageToUploadName, country, locality, latitude, longitude);
                             if (landmarkRecognitionDatabase.recognizedImagesDao().getCountByPath(imageToUpload.getAbsolutePath()) == 0){
@@ -168,22 +155,21 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
                                 editor.putBoolean(recognizedImage.getPath(), false);
                                 editor.apply();
                             }
-                            UnrecognizedImages imageToBeDeleted = landmarkRecognitionDatabase.unrecognizedImagesDao().getImageByPath(unrecognizedImagesList.get(pos));
-                            landmarkRecognitionDatabase.unrecognizedImagesDao().deleteUnrecognizedImages(imageToBeDeleted);
+                            landmarkRecognitionDatabase.unrecognizedImagesDao().deleteUnrecognizedImages(unrecognizedImagesList.get(pos));
                             if (pos == 0) {
                                 if (unrecognizedImagesList.size() == 1) {
                                     unrecognizedImagesList.remove(pos);
-                                    imageViewPager.notifyItemRemoved(pos);
+                                    unrecognizedImageViewPager.notifyItemRemoved(pos);
                                     finish();
                                 } else {
                                     viewPager.setCurrentItem(pos + 1);
                                     unrecognizedImagesList.remove(pos);
-                                    imageViewPager.notifyItemRemoved(pos);
+                                    unrecognizedImageViewPager.notifyItemRemoved(pos);
                                 }
                             } else {
                                 viewPager.setCurrentItem(pos - 1);
                                 unrecognizedImagesList.remove(pos);
-                                imageViewPager.notifyItemRemoved(pos);
+                                unrecognizedImageViewPager.notifyItemRemoved(pos);
                             }
                         } catch (IOException | JSONException e) {
                             e.printStackTrace();
@@ -203,10 +189,9 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
     }
 
     private void deleteFile(int pos) {
-        UnrecognizedImages imageToBeDeleted = landmarkRecognitionDatabase.unrecognizedImagesDao().getImageByPath(unrecognizedImagesList.get(pos));
-        landmarkRecognitionDatabase.unrecognizedImagesDao().deleteUnrecognizedImages(imageToBeDeleted);
-        new File(unrecognizedImagesList.get(pos)).getAbsoluteFile().delete();
+        landmarkRecognitionDatabase.unrecognizedImagesDao().deleteUnrecognizedImages(unrecognizedImagesList.get(pos));
+        new File(unrecognizedImagesList.get(pos).getPath()).getAbsoluteFile().delete();
         unrecognizedImagesList.remove(pos);
-        imageViewPager.notifyItemRemoved(pos);
+        unrecognizedImageViewPager.notifyItemRemoved(pos);
     }
 }

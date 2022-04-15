@@ -13,13 +13,13 @@ import androidx.annotation.Nullable;
 
 import com.bumptech.glide.Glide;
 
-import java.util.ArrayList;
+import java.util.List;
 
-public class GalleryUnrecognizedImageAdapter extends ArrayAdapter<String> {
+public class GalleryUnrecognizedImageAdapter extends ArrayAdapter<UnrecognizedImages> {
     private Context context;
-    private ArrayList<String> imagePaths;
+    private List<UnrecognizedImages> imagePaths;
 
-    public GalleryUnrecognizedImageAdapter(@NonNull Context context, @NonNull ArrayList<String> imagePaths) {
+    public GalleryUnrecognizedImageAdapter(@NonNull Context context, @NonNull List<UnrecognizedImages> imagePaths) {
         super(context, R.layout.image, imagePaths);
         this.context = context;
         this.imagePaths = imagePaths;
@@ -32,7 +32,7 @@ public class GalleryUnrecognizedImageAdapter extends ArrayAdapter<String> {
 
     @Nullable
     @Override
-    public String getItem(int position) {
+    public UnrecognizedImages getItem(int position) {
         return imagePaths.get(position);
     }
 
@@ -58,8 +58,9 @@ public class GalleryUnrecognizedImageAdapter extends ArrayAdapter<String> {
             intent.putExtra("position", position);
             context.startActivity(intent);
         });
-        String filename = getItem(position);
-        Glide.with(context).load(filename).into(imageView);
+        UnrecognizedImages unrecognizedImage = getItem(position);
+        assert unrecognizedImage != null;
+        Glide.with(context).load(unrecognizedImage.getPath()).into(imageView);
         return imageView;
     }
 }

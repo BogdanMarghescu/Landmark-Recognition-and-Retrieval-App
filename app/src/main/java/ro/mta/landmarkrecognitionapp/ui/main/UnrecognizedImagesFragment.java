@@ -8,20 +8,20 @@ import android.widget.GridView;
 
 import androidx.fragment.app.Fragment;
 
-import java.io.File;
-import java.util.ArrayList;
+import java.util.List;
 
 import ro.mta.landmarkrecognitionapp.GalleryUnrecognizedImageAdapter;
+import ro.mta.landmarkrecognitionapp.LandmarkRecognitionDatabase;
 import ro.mta.landmarkrecognitionapp.R;
+import ro.mta.landmarkrecognitionapp.UnrecognizedImages;
 
 public class UnrecognizedImagesFragment extends Fragment {
     private GridView imageGrid;
-    private ArrayList<String> unrecognizedImagesList;
-    private String unrecognizedImagesDirLocation;
+    private List<UnrecognizedImages> unrecognizedImagesList;
+    private LandmarkRecognitionDatabase landmarkRecognitionDatabase;
     private GalleryUnrecognizedImageAdapter galleryUnrecognizedImageAdapter;
 
     public UnrecognizedImagesFragment() {
-        // Required empty public constructor
     }
 
     public static UnrecognizedImagesFragment newInstance() {
@@ -37,16 +37,9 @@ public class UnrecognizedImagesFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_unrecognized_images, container, false);
+        landmarkRecognitionDatabase = LandmarkRecognitionDatabase.getInstance(view.getContext());
         imageGrid = view.findViewById(R.id.unrecognized_gallery);
-        unrecognizedImagesDirLocation = requireContext().getFilesDir().getPath() + "/Unrecognized Images";
-        File unrecognizedImagesDir = new File(unrecognizedImagesDirLocation);
-        File[] files = unrecognizedImagesDir.listFiles();
-        unrecognizedImagesList = new ArrayList<>();
-        for (File file : files) {
-            unrecognizedImagesList.add(file.getAbsolutePath());
-        }
-        if (unrecognizedImagesList.size() > 1)
-            unrecognizedImagesList.sort(String::compareTo);
+        unrecognizedImagesList = landmarkRecognitionDatabase.unrecognizedImagesDao().getUnrecognizedImagesList();
         galleryUnrecognizedImageAdapter = new GalleryUnrecognizedImageAdapter(requireContext(), unrecognizedImagesList);
         imageGrid.setAdapter(galleryUnrecognizedImageAdapter);
         return view;

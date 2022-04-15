@@ -14,7 +14,6 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import ro.mta.landmarkrecognitionapp.databinding.ActivityMapsBinding;
@@ -25,7 +24,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ActivityMapsBinding binding;
     LandmarkRecognitionDatabase landmarkRecognitionDatabase;
     List<RecognizedImages> recognizedImagesList;
-    ArrayList<String> recognizedImagesListString;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,20 +55,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             coords = new LatLng(recognizedImagesList.get(0).getLatitude(), recognizedImagesList.get(0).getLongitude());
             map.moveCamera(CameraUpdateFactory.newLatLng(coords));
         }
-        map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-            @Override
-            public boolean onMarkerClick(@NonNull Marker marker) {
-                int position = (int) marker.getTag();
-                String landmarkName = recognizedImagesList.get(position).getLandmarkName();
-                List<RecognizedImages> recognizedImagesListByLandmark = landmarkRecognitionDatabase.recognizedImagesDao().getImagesByLandmark(landmarkName);
-                recognizedImagesListString = new ArrayList<>();
-                for (RecognizedImages recognizedImage : recognizedImagesListByLandmark)
-                    recognizedImagesListString.add(recognizedImage.getPath());
-                Intent intentImages = new Intent(getApplicationContext(), ViewPhotoRecognizedActivity.class);
-                intentImages.putExtra("image_list", recognizedImagesListString);
-                startActivity(intentImages);
-                return false;
-            }
+        map.setOnMarkerClickListener(marker -> {
+            int position = (int) marker.getTag();
+            String landmarkName = recognizedImagesList.get(position).getLandmarkName();
+            Intent intentImages = new Intent(getApplicationContext(), ViewPhotoRecognizedActivity.class);
+            intentImages.putExtra("landmark_images", landmarkName);
+            startActivity(intentImages);
+            return false;
         });
     }
 }

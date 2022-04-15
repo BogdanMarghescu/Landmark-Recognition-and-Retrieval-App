@@ -12,7 +12,7 @@ import java.util.List;
 @Dao
 public interface UnrecognizedImagesDao {
     @Query("SELECT * FROM unrecognized_images")
-    List<UnrecognizedImages> getRecognizedImagesList();
+    List<UnrecognizedImages> getUnrecognizedImagesList();
 
     @Query("SELECT COUNT(*) FROM unrecognized_images")
     int getCount();
