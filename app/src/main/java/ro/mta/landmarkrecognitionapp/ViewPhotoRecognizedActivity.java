@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
@@ -30,6 +31,7 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
     private ImageButton deleteButton;
     private ImageButton shareImage;
     private ImageButton favoriteButton;
+    private TextView landmarkTitleTextView;
     private MaterialButton detailsImageButton;
     private SharedPreferences sharedPreferences;
     private String sortType;
@@ -156,6 +158,10 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             dialog.show();
         });
 
+        landmarkTitleTextView = findViewById(R.id.landmark_name_title);
+        RecognizedImages image = recognizedImagesList.get(viewPager.getCurrentItem());
+        landmarkTitleTextView.setText(image.getLandmarkName());
+
         favoriteButton = findViewById(R.id.favoriteButton);
         setFavoriteIcon();
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -163,6 +169,8 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             public void onPageSelected(int position) {
                 setFavoriteIcon();
                 super.onPageSelected(position);
+                RecognizedImages image = recognizedImagesList.get(viewPager.getCurrentItem());
+                landmarkTitleTextView.setText(image.getLandmarkName());
             }
         });
         favoriteButton.setOnClickListener(view -> {
