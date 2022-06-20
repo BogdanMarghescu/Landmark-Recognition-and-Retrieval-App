@@ -6,8 +6,11 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Html;
+import android.text.method.LinkMovementMethod;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
@@ -30,6 +33,7 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
     private ImageButton deleteButton;
     private ImageButton shareImage;
     private ImageButton favoriteButton;
+    private TextView landmarkTitleTextView;
     private MaterialButton detailsImageButton;
     private SharedPreferences sharedPreferences;
     private String sortType;
@@ -133,12 +137,17 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             File file = new File(recognizedImagesList.get(pos).getPath());
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setCancelable(true);
-            builder.setTitle("Image " + file.getName() + " details:");
-            builder.setMessage("Landmark Name: " + image.getLandmarkName() +
-                    "\nCountry: " + image.getCountry() +
-                    "\nLocality: " + image.getLocality() +
-                    "\nLatitude: " + image.getLatitude() +
-                    "\nLongitude: " + image.getLongitude());
+            builder.setTitle("Image details for:\n" + file.getName());
+            if (!image.getWiki_url().isEmpty()) {
+                builder.setMessage(Html.fromHtml("<b>Landmark Name:</b>  " + image.getLandmarkName() + "<br>" +
+                        "<b>Country:</b>  " + image.getCountry() + "<br>" +
+                        "<b>Locality:</b>  " + image.getLocality() + "<br>" +
+                        "<b>Wikipedia Article:</b>  <a href=" + image.getWiki_url() + "><big>Click Here</big></a><br>", Html.FROM_HTML_MODE_COMPACT));
+            } else {
+                builder.setMessage(Html.fromHtml("<b>Landmark Name:</b>  " + image.getLandmarkName() + "<br>" +
+                        "<b>Country:</b>  " + image.getCountry() + "<br>" +
+                        "<b>Locality:</b>  " + image.getLocality() + "<br>", Html.FROM_HTML_MODE_COMPACT));
+            }
             if (intent.hasExtra("landmark_images")) {
                 builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
                 }).setIcon(android.R.drawable.ic_dialog_alert);
@@ -154,7 +163,12 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             }
             AlertDialog dialog = builder.create();
             dialog.show();
+            ((TextView) dialog.findViewById(android.R.id.message)).setMovementMethod(LinkMovementMethod.getInstance());
         });
+
+        landmarkTitleTextView = findViewById(R.id.landmark_name_title);
+        RecognizedImages image = recognizedImagesList.get(viewPager.getCurrentItem());
+        landmarkTitleTextView.setText(image.getLandmarkName());
 
         favoriteButton = findViewById(R.id.favoriteButton);
         setFavoriteIcon();
@@ -163,6 +177,8 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
             public void onPageSelected(int position) {
                 setFavoriteIcon();
                 super.onPageSelected(position);
+                RecognizedImages image = recognizedImagesList.get(viewPager.getCurrentItem());
+                landmarkTitleTextView.setText(image.getLandmarkName());
             }
         });
         favoriteButton.setOnClickListener(view -> {
