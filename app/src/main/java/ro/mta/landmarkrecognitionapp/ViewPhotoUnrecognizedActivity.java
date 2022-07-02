@@ -121,6 +121,8 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
                             JSONObject resp = new JSONObject(response.body().string());
                             String imageClassID = String.valueOf(resp.get("image_class_id"));
                             String landmarkName = String.valueOf(resp.get("landmark_name"));
+                            String wikiURL = String.valueOf(resp.get("wiki_url"));
+                            String similarImagesList = String.valueOf(resp.get("similar_images"));
                             String country = null;
                             String locality = null;
                             JSONArray address_components = (JSONArray) resp.get("address_components");
@@ -146,7 +148,7 @@ public class ViewPhotoUnrecognizedActivity extends AppCompatActivity {
                             imageToUploadName = imageToUploadName.substring(0, imageToUploadName.lastIndexOf("."));
                             File fileToUpload = new File(getFilesDir().getPath() + "/Recognized Images", imageToUpload.getName());
                             imageToUpload.renameTo(fileToUpload);
-                            RecognizedImages recognizedImage = new RecognizedImages(fileToUpload.getAbsolutePath(), landmarkName, imageToUploadName, country, locality, latitude, longitude);
+                            RecognizedImages recognizedImage = new RecognizedImages(fileToUpload.getAbsolutePath(), landmarkName, imageToUploadName, country, locality, wikiURL, similarImagesList, latitude, longitude);
                             if (landmarkRecognitionDatabase.recognizedImagesDao().getCountByPath(imageToUpload.getAbsolutePath()) == 0){
                                 landmarkRecognitionDatabase.recognizedImagesDao().insertRecognizedImages(recognizedImage);
                                 SharedPreferences sharedPreferences;

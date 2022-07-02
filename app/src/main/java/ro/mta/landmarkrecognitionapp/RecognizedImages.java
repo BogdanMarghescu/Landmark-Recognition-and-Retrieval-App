@@ -23,29 +23,37 @@ public class RecognizedImages implements Parcelable {
     private String country;
     @ColumnInfo(name = "locality")
     private String locality;
+    @ColumnInfo(name = "wiki_url")
+    private String wiki_url;
+    @ColumnInfo(name = "similar_images")
+    private String similar_images;
     @ColumnInfo(name = "latitude")
     private double latitude;
     @ColumnInfo(name = "longitude")
     private double longitude;
 
-    public RecognizedImages(int id, String path, String landmarkName, String dateTaken, String country, String locality, double latitude, double longitude) {
+    public RecognizedImages(int id, String path, String landmarkName, String dateTaken, String country, String locality, String wiki_url, String similar_images, double latitude, double longitude) {
         this.id = id;
         this.path = path;
         this.landmarkName = landmarkName;
         this.dateTaken = dateTaken;
         this.country = country;
         this.locality = locality;
+        this.wiki_url = wiki_url;
+        this.similar_images = similar_images;
         this.latitude = latitude;
         this.longitude = longitude;
     }
 
     @Ignore
-    public RecognizedImages(String path, String landmarkName, String dateTaken, String country, String locality, double latitude, double longitude) {
+    public RecognizedImages(String path, String landmarkName, String dateTaken, String country, String locality, String wiki_url, String similar_images, double latitude, double longitude) {
         this.path = path;
         this.landmarkName = landmarkName;
         this.dateTaken = dateTaken;
         this.country = country;
         this.locality = locality;
+        this.wiki_url = wiki_url;
+        this.similar_images = similar_images;
         this.latitude = latitude;
         this.longitude = longitude;
     }
@@ -98,6 +106,22 @@ public class RecognizedImages implements Parcelable {
         this.locality = locality;
     }
 
+    public String getWiki_url() {
+        return wiki_url;
+    }
+
+    public void setWiki_url(String wiki_url) {
+        this.wiki_url = wiki_url;
+    }
+
+    public String getSimilar_images() {
+        return similar_images;
+    }
+
+    public void setSimilar_images(String similar_images) {
+        this.similar_images = similar_images;
+    }
+
     public double getLatitude() {
         return latitude;
     }
@@ -127,6 +151,8 @@ public class RecognizedImages implements Parcelable {
         dest.writeString(this.dateTaken);
         dest.writeString(this.country);
         dest.writeString(this.locality);
+        dest.writeString(this.wiki_url);
+        dest.writeString(this.similar_images);
         dest.writeDouble(this.latitude);
         dest.writeDouble(this.longitude);
     }
@@ -138,6 +164,8 @@ public class RecognizedImages implements Parcelable {
         this.dateTaken = source.readString();
         this.country = source.readString();
         this.locality = source.readString();
+        this.wiki_url = source.readString();
+        this.similar_images = source.readString();
         this.latitude = source.readDouble();
         this.longitude = source.readDouble();
     }
@@ -149,6 +177,8 @@ public class RecognizedImages implements Parcelable {
         this.dateTaken = in.readString();
         this.country = in.readString();
         this.locality = in.readString();
+        this.wiki_url = in.readString();
+        this.similar_images = in.readString();
         this.latitude = in.readDouble();
         this.longitude = in.readDouble();
     }
