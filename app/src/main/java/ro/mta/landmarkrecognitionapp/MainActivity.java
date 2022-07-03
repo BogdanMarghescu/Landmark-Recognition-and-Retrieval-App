@@ -100,8 +100,20 @@ public class MainActivity extends AppCompatActivity {
                 showAlertDialog();
                 return true;
             case R.id.item2:
-                Intent intent = new Intent(getApplicationContext(), MapsActivity.class);
-                startActivity(intent);
+                File recognizedImagesDir = new File(recognizedImagesDirLocation);
+                if (recognizedImagesDir.length() > 0) {
+                    Intent intent = new Intent(getApplicationContext(), MapsActivity.class);
+                    startActivity(intent);
+                } else {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setCancelable(true);
+                    builder.setTitle("Empty Map");
+                    builder.setMessage("There are no landmarks to be localized, try visiting this menu when you have recognized images.");
+                    builder.setPositiveButton(android.R.string.ok, null);
+                    builder.setIcon(android.R.drawable.ic_dialog_alert);
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                }
                 return true;
             default:
                 return super.onOptionsItemSelected(item);

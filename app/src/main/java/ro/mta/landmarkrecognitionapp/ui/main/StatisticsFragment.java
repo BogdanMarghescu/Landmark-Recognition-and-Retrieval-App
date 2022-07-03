@@ -64,10 +64,12 @@ public class StatisticsFragment extends Fragment {
         Map<String, ?> allEntries = sharedPreferences.getAll();
         int numFavorites = 0, numNotFavorites = 0;
         for (Map.Entry<String, ?> entry : allEntries.entrySet()) {
-            if (entry.getValue().getClass().equals(Boolean.class) && (boolean)entry.getValue())
-                numFavorites++;
-            else
-                numNotFavorites++;
+            if (entry.getValue().getClass().equals(Boolean.class)) {
+                if ((boolean) entry.getValue())
+                    numFavorites++;
+                else
+                    numNotFavorites++;
+            }
         }
         pieEntries = new ArrayList<>();
         pieEntries.add(new PieEntry(numFavorites, "Favorite"));
@@ -77,21 +79,21 @@ public class StatisticsFragment extends Fragment {
         ArrayList<CountryCount> countryCountArrayList = (ArrayList<CountryCount>) landmarkRecognitionDatabase.recognizedImagesDao().getCountries();
         pieChart_countries_count = view.findViewById(R.id.piechart_country);
         pieEntries = new ArrayList<>();
-        for(CountryCount countryCount: countryCountArrayList)
+        for (CountryCount countryCount : countryCountArrayList)
             pieEntries.add(new PieEntry(countryCount.count, countryCount.country));
         setPieChart(pieChart_countries_count, pieEntries);
 
         ArrayList<LocalityCount> localityCountArrayList = (ArrayList<LocalityCount>) landmarkRecognitionDatabase.recognizedImagesDao().getLocalities();
         pieChart_locality_count = view.findViewById(R.id.piechart_locality);
         pieEntries = new ArrayList<>();
-        for(LocalityCount localityCount: localityCountArrayList)
+        for (LocalityCount localityCount : localityCountArrayList)
             pieEntries.add(new PieEntry(localityCount.count, localityCount.locality));
         setPieChart(pieChart_locality_count, pieEntries);
 
         ArrayList<LandmarkCount> landmarkCountArrayList = (ArrayList<LandmarkCount>) landmarkRecognitionDatabase.recognizedImagesDao().getLandmarks();
         pieChart_landmark_count = view.findViewById(R.id.piechart_landmark);
         pieEntries = new ArrayList<>();
-        for(LandmarkCount landmarkCount: landmarkCountArrayList)
+        for (LandmarkCount landmarkCount : landmarkCountArrayList)
             pieEntries.add(new PieEntry(landmarkCount.count, landmarkCount.landmark_name));
         setPieChart(pieChart_landmark_count, pieEntries);
 

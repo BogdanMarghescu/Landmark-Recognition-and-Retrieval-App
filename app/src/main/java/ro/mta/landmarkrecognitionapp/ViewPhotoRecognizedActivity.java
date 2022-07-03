@@ -167,7 +167,7 @@ public class ViewPhotoRecognizedActivity extends AppCompatActivity {
                     startActivity(intentSimilar);
                 } else Toast.makeText(this, "No Similar Images Found!", Toast.LENGTH_SHORT).show();
             });
-            builder.setIcon(android.R.drawable.ic_dialog_alert);
+            builder.setIcon(android.R.drawable.ic_dialog_info);
             AlertDialog dialog = builder.create();
             dialog.show();
             ((TextView) dialog.findViewById(android.R.id.message)).setMovementMethod(LinkMovementMethod.getInstance());
