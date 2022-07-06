@@ -51,10 +51,6 @@ CONFIG = dict(
     epochs=5,
     learning_rate=5e-4,
     scheduler=None,
-    # min_lr = 1e-6,
-    # T_max = 20,
-    # T_0 = 25,
-    # warmup_epochs = 0,
     weight_decay=1e-6,
     n_accumulate=1,
     # n_fold=10,
@@ -172,82 +168,60 @@ def criterion(outputs, targets):
 def train_one_epoch(model, optimizer, scheduler, dataloader, device, epoch):
     model.train()
     scaler = amp.GradScaler()
-
     dataset_size = 0
     running_loss = 0.0
     bar = tqdm(enumerate(dataloader), total=len(dataloader))
     for step, (images, labels) in bar:
         images = images.to(device, dtype=torch.float)
         labels = labels.to(device, dtype=torch.long)
-
         batch_size = images.size(0)
-
         with amp.autocast(enabled=True):
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss = loss / CONFIG['n_accumulate']
-
         scaler.scale(loss).backward()
-
         if (step + 1) % CONFIG['n_accumulate'] == 0:
             scaler.step(optimizer)
             scaler.update()
-
             # zero the parameter gradients
             for p in model.parameters():
                 p.grad = None
-
             if scheduler is not None:
                 scheduler.step()
-
         running_loss += (loss.item() * batch_size)
         dataset_size += batch_size
-
         epoch_loss = running_loss / dataset_size
-
         bar.set_postfix(Epoch=epoch, Train_Loss=epoch_loss, LR=optimizer.param_groups[0]['lr'])
     gc.collect()
-
     return epoch_loss
 
 
 @torch.no_grad()
 def valid_one_epoch(model, optimizer, dataloader, device, epoch):
     model.eval()
-
     dataset_size = 0
     running_loss = 0.0
-
     TARGETS = []
     PREDS = []
-
     bar = tqdm(enumerate(dataloader), total=len(dataloader))
     for step, (images, labels) in bar:
         images = images.to(device, dtype=torch.float)
         labels = labels.to(device, dtype=torch.long)
-
         batch_size = images.size(0)
-
         outputs = model(images)
         _, preds = torch.max(outputs, 1)
         loss = criterion(outputs, labels)
-
         running_loss += (loss.item() * batch_size)
         dataset_size += batch_size
-
         epoch_loss = running_loss / dataset_size
-
         PREDS.append(preds.view(-1).cpu().detach().numpy())
         TARGETS.append(labels.view(-1).cpu().detach().numpy())
-
         bar.set_postfix(Epoch=epoch, Valid_Loss=epoch_loss, LR=optimizer.param_groups[0]['lr'])
-
     TARGETS = np.concatenate(TARGETS)
     PREDS = np.concatenate(PREDS)
     val_acc = accuracy_score(TARGETS, PREDS)
     val_f1_score = f1_score(TARGETS, PREDS, average='macro')
     gc.collect()
-
     return epoch_loss, val_acc, val_f1_score
 
 
@@ -255,31 +229,25 @@ def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=N
     wandb.watch(model, log_freq=100)    # To automatically log gradients
     if torch.cuda.is_available():
         print(f"[INFO] Using GPU: {torch.cuda.get_device_name()}\n")
-
     start = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_epoch_acc = 0
     history = defaultdict(list)
-
     for epoch in range(1, CONFIG['epochs'] + 1):
         gc.collect()
         train_epoch_loss = train_one_epoch(model, optimizer, scheduler, train_loader, device=CONFIG['device'], epoch=epoch)
         val_epoch_loss, val_epoch_acc, val_f1_score = valid_one_epoch(model, optimizer, valid_loader, device=CONFIG['device'], epoch=epoch)
-
         history['Train Loss'].append(train_epoch_loss)
         history['Valid Loss'].append(val_epoch_loss)
         history['Valid Acc'].append(val_epoch_acc)
         history['Valid F1 Score'].append(val_f1_score)
-
         # Log the metrics
         wandb.log({"Train Loss": train_epoch_loss})
         wandb.log({"Valid Loss": val_epoch_loss})
         wandb.log({"Valid Acc": val_epoch_acc})
         wandb.log({"Valid F1 Score": val_f1_score})
-
         print(f'Valid Acc: {val_epoch_acc}')
         print(f'Valid F1 Score: {val_f1_score}')
-
         # deep copy the model
         if val_epoch_acc >= best_epoch_acc:
             print(f"Validation Acc Improved ({best_epoch_acc} ---> {val_epoch_acc})")
@@ -294,17 +262,13 @@ def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=N
             # Save a model file from the current directory
             wandb.save(PATH)
             print(f"Model Saved to {PATH}")
-
         print()
-
     end = time.time()
     time_elapsed = end - start
     print(f"Training complete in {time_elapsed // 3600:.0f}h {(time_elapsed % 3600) // 60:.0f}m {(time_elapsed % 3600) % 60:.0f}s")
     print(f"Best ACC: {best_epoch_acc:.4f}")
-
     # load best model weights
     model.load_state_dict(best_model_wts)
-
     return model, history
 
 
