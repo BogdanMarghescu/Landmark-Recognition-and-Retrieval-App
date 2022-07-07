@@ -5,12 +5,8 @@ import copy
 import time
 import random
 import wandb
-
-# For data manipulation
 import numpy as np
 import pandas as pd
-
-# Pytorch Imports
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -18,22 +14,14 @@ from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
 from torch.cuda import amp
 import timm
-
-# Utils
 import joblib
 from tqdm import tqdm
 from collections import defaultdict
-
-# Sklearn Imports
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedKFold, train_test_split
-
-# Albumentations for augmentations
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-
-# For descriptive error messages
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 # Training Configuration
@@ -63,15 +51,12 @@ CONFIG = dict(
 
 
 def set_seed(seed=42):
-    """Sets the seed of the entire notebook so results are the same every time we run. This is for REPRODUCIBILITY."""
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    # When running on the CuDNN backend, two further options must be set
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
-    # Set a fixed value for the hash seed
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
@@ -142,12 +127,12 @@ class LandmarkRetrievalModel(nn.Module):
         self.fc = nn.Linear(self.n_features, CONFIG['num_classes'])
 
     def forward(self, x):
-        features = self.model(x)  # features = (bs, embedding_size)
-        output = self.fc(features)  # outputs = (bs, num_classes)
+        features = self.model(x)
+        output = self.fc(features)
         return output
 
     def extract_features(self, x):
-        features = self.model(x)  # features = (bs, embedding_size)
+        features = self.model(x)
         return features
 
 
@@ -183,7 +168,6 @@ def train_one_epoch(model, optimizer, scheduler, dataloader, device, epoch):
         if (step + 1) % CONFIG['n_accumulate'] == 0:
             scaler.step(optimizer)
             scaler.update()
-            # zero the parameter gradients
             for p in model.parameters():
                 p.grad = None
             if scheduler is not None:
@@ -226,7 +210,7 @@ def valid_one_epoch(model, optimizer, dataloader, device, epoch):
 
 
 def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=None):
-    wandb.watch(model, log_freq=100)    # To automatically log gradients
+    wandb.watch(model, log_freq=100)
     if torch.cuda.is_available():
         print(f"[INFO] Using GPU: {torch.cuda.get_device_name()}\n")
     start = time.time()
@@ -241,14 +225,12 @@ def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=N
         history['Valid Loss'].append(val_epoch_loss)
         history['Valid Acc'].append(val_epoch_acc)
         history['Valid F1 Score'].append(val_f1_score)
-        # Log the metrics
         wandb.log({"Train Loss": train_epoch_loss})
         wandb.log({"Valid Loss": val_epoch_loss})
         wandb.log({"Valid Acc": val_epoch_acc})
         wandb.log({"Valid F1 Score": val_f1_score})
         print(f'Valid Acc: {val_epoch_acc}')
         print(f'Valid F1 Score: {val_f1_score}')
-        # deep copy the model
         if val_epoch_acc >= best_epoch_acc:
             print(f"Validation Acc Improved ({best_epoch_acc} ---> {val_epoch_acc})")
             best_epoch_acc = val_epoch_acc
@@ -259,7 +241,6 @@ def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=N
             else:
                 PATH = f"ACC{best_epoch_acc:.4f}_epoch{epoch:.0f}_fold{fold}.bin"
             torch.save(model.state_dict(), PATH)
-            # Save a model file from the current directory
             wandb.save(PATH)
             print(f"Model Saved to {PATH}")
         print()
@@ -267,7 +248,6 @@ def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=N
     time_elapsed = end - start
     print(f"Training complete in {time_elapsed // 3600:.0f}h {(time_elapsed % 3600) // 60:.0f}m {(time_elapsed % 3600) % 60:.0f}s")
     print(f"Best ACC: {best_epoch_acc:.4f}")
-    # load best model weights
     model.load_state_dict(best_model_wts)
     return model, history
 
