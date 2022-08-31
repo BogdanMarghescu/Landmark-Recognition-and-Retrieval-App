@@ -1,4 +1,4 @@
-# Landmark-Recognition-and-Retrieval-App
+# Landmark Recognition and Retrieval App
 <div align="justify">
 &nbsp;&nbsp;&nbsp;&nbsp;Detecting similar images is a fundamental problem in computer vision: having an initial image, can we find similar images in a large data set? This issue is very important especially in the case of images that contain landmarks, which represent a big part of what people like to photograph. For this reason, in recent years, research in this field has grown, which has led to the emergence of many algorithms capable of detecting similar images in a large data set.
 </div>
