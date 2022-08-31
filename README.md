@@ -5,7 +5,7 @@
 <br>
 
 <div align="justify">
-&nbsp;&nbsp;&nbsp;&nbsp;This paper presents the methodology implemented to perform the task of recognizing and extracting similar images in a mobile application.
+&nbsp;&nbsp;&nbsp;&nbsp;This repository presents the methodology implemented to perform the task of recognizing and extracting similar images in a mobile application.
 </div>
 <br>
 
