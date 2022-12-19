@@ -1,36 +1,32 @@
 import os
-import gc
 import cv2
-import copy
 import time
-import random
 import wandb
-import numpy as np
+import joblib
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import StratifiedKFold, train_test_split
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
-from torch.cuda import amp
+from torchmetrics.functional import accuracy
 import timm
-import joblib
-from tqdm import tqdm
-from collections import defaultdict
-from sklearn.metrics import accuracy_score, f1_score
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import StratifiedKFold, train_test_split
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies.ddp import DDPStrategy
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 # Training Configuration
-ROOT_DIR = "../landmark_retrieval_dataset/"
-TRAIN_DIR = ROOT_DIR + "train"
-TEST_DIR = ROOT_DIR + "test"
-RUN_NAME = "train05"
-NUM_GPUS = 8
+ROOT_DIR = "landmark_retrieval_dataset/"
+TRAIN_DIR = os.path.join(ROOT_DIR, "train")
+TEST_DIR = os.path.join(ROOT_DIR, "test")
+RUN_NAME = "train12"
 CONFIG = dict(
+    num_gpus=8,
     seed=42,
     model_name='tf_mobilenetv3_small_100',
     train_batch_size=384,
@@ -38,26 +34,23 @@ CONFIG = dict(
     img_size=224,
     epochs=5,
     learning_rate=5e-4,
-    scheduler=None,
     weight_decay=1e-6,
     n_accumulate=1,
     # n_fold=10,
-    dev_size=0.2,
+    valid_size=0.1,
     num_classes=81313,
-    device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
-    competition='GOOGL',
-    _wandb_kernel='deb'
+    competition='Google Landmark Retrieval',
+    _wandb_kernel='deb',
 )
 
 
-def set_seed(seed=42):
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
+def set_seed():
+    pl.seed_everything(CONFIG['seed'], workers=True)
+    torch.manual_seed(CONFIG['seed'])
+    torch.cuda.manual_seed(CONFIG['seed'])
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['PYTHONHASHSEED'] = str(CONFIG['seed'])
 
 
 def get_train_file_path(id):
@@ -110,18 +103,20 @@ data_transforms = {
 }
 
 
-def prepare_loaders(df_train, df_valid, num_workers=0):
+def prepare_loaders(df_train, df_valid):
     train_dataset = LandmarkDataset(TRAIN_DIR, df_train, transforms=data_transforms['train'])
     valid_dataset = LandmarkDataset(TRAIN_DIR, df_valid, transforms=data_transforms['valid'])
-    train_loader = DataLoader(train_dataset, batch_size=CONFIG['train_batch_size'], num_workers=num_workers, shuffle=True, pin_memory=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=CONFIG['valid_batch_size'], num_workers=num_workers, shuffle=False, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=CONFIG['train_batch_size'], num_workers=4*CONFIG['num_gpus'], shuffle=True, pin_memory=True, persistent_workers=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=CONFIG['valid_batch_size'], num_workers=4*CONFIG['num_gpus'], shuffle=False, pin_memory=True, persistent_workers=True)
     return train_loader, valid_loader
 
 
-class LandmarkRetrievalModel(nn.Module):
-    def __init__(self, model_name, pretrained=True):
+class LandmarkRetrievalModel(pl.LightningModule):
+    def __init__(self):
         super(LandmarkRetrievalModel, self).__init__()
-        self.model = timm.create_model(model_name, pretrained=pretrained)
+        self.save_hyperparameters()
+        self.criterion = nn.CrossEntropyLoss()
+        self.model = timm.create_model(CONFIG['model_name'], pretrained=True)
         self.n_features = self.model.classifier.in_features
         self.model.reset_classifier(0)
         self.fc = nn.Linear(self.n_features, CONFIG['num_classes'])
@@ -130,166 +125,96 @@ class LandmarkRetrievalModel(nn.Module):
         features = self.model(x)
         output = self.fc(features)
         return output
+        
+    def configure_optimizers(self):
+        return optim.Adam(self.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'])
 
-    def extract_features(self, x):
-        features = self.model(x)
-        return features
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        train_loss = self.criterion(y_hat, y)
+        self.log('train_loss', train_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        preds = torch.argmax(y_hat, dim=1)
+        train_acc = accuracy(preds, y, 'multiclass', num_classes=CONFIG['num_classes'])
+        self.log('train_acc', train_acc, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        return {'loss': train_loss, 'train_acc': train_acc}
 
-
-def fetch_scheduler(optimizer):
-    if CONFIG['scheduler'] == 'CosineAnnealingLR':
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG['T_max'], eta_min=CONFIG['min_lr'])
-    elif CONFIG['scheduler'] == 'CosineAnnealingWarmRestarts':
-        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=CONFIG['T_0'], T_mult=1, eta_min=CONFIG['min_lr'])
-    elif CONFIG['scheduler'] is None:
-        return None
-    return scheduler
-
-
-def criterion(outputs, targets):
-    return nn.CrossEntropyLoss()(outputs, targets)
-
-
-def train_one_epoch(model, optimizer, scheduler, dataloader, device, epoch):
-    model.train()
-    scaler = amp.GradScaler()
-    dataset_size = 0
-    running_loss = 0.0
-    bar = tqdm(enumerate(dataloader), total=len(dataloader))
-    for step, (images, labels) in bar:
-        images = images.to(device, dtype=torch.float)
-        labels = labels.to(device, dtype=torch.long)
-        batch_size = images.size(0)
-        with amp.autocast(enabled=True):
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss = loss / CONFIG['n_accumulate']
-        scaler.scale(loss).backward()
-        if (step + 1) % CONFIG['n_accumulate'] == 0:
-            scaler.step(optimizer)
-            scaler.update()
-            for p in model.parameters():
-                p.grad = None
-            if scheduler is not None:
-                scheduler.step()
-        running_loss += (loss.item() * batch_size)
-        dataset_size += batch_size
-        epoch_loss = running_loss / dataset_size
-        bar.set_postfix(Epoch=epoch, Train_Loss=epoch_loss, LR=optimizer.param_groups[0]['lr'])
-    gc.collect()
-    return epoch_loss
+    @torch.no_grad()
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        valid_loss = self.criterion(y_hat, y)
+        self.log('valid_loss', valid_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        preds = torch.argmax(y_hat, dim=1)
+        valid_acc = accuracy(preds, y, 'multiclass', num_classes=CONFIG['num_classes'])
+        self.log('valid_acc', valid_acc, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        return {'loss': valid_loss, 'valid_acc': valid_acc}
 
 
-@torch.no_grad()
-def valid_one_epoch(model, optimizer, dataloader, device, epoch):
-    model.eval()
-    dataset_size = 0
-    running_loss = 0.0
-    TARGETS = []
-    PREDS = []
-    bar = tqdm(enumerate(dataloader), total=len(dataloader))
-    for step, (images, labels) in bar:
-        images = images.to(device, dtype=torch.float)
-        labels = labels.to(device, dtype=torch.long)
-        batch_size = images.size(0)
-        outputs = model(images)
-        _, preds = torch.max(outputs, 1)
-        loss = criterion(outputs, labels)
-        running_loss += (loss.item() * batch_size)
-        dataset_size += batch_size
-        epoch_loss = running_loss / dataset_size
-        PREDS.append(preds.view(-1).cpu().detach().numpy())
-        TARGETS.append(labels.view(-1).cpu().detach().numpy())
-        bar.set_postfix(Epoch=epoch, Valid_Loss=epoch_loss, LR=optimizer.param_groups[0]['lr'])
-    TARGETS = np.concatenate(TARGETS)
-    PREDS = np.concatenate(PREDS)
-    val_acc = accuracy_score(TARGETS, PREDS)
-    val_f1_score = f1_score(TARGETS, PREDS, average='macro')
-    gc.collect()
-    return epoch_loss, val_acc, val_f1_score
-
-
-def run_training(model, optimizer, scheduler, train_loader, valid_loader, fold=None):
-    wandb.watch(model, log_freq=100)
-    if torch.cuda.is_available():
-        print(f"[INFO] Using GPU: {torch.cuda.get_device_name()}\n")
+def run_training(model, train_loader, valid_loader, wandb_logger, fold=None):
     start = time.time()
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_epoch_acc = 0
-    history = defaultdict(list)
-    for epoch in range(1, CONFIG['epochs'] + 1):
-        gc.collect()
-        train_epoch_loss = train_one_epoch(model, optimizer, scheduler, train_loader, device=CONFIG['device'], epoch=epoch)
-        val_epoch_loss, val_epoch_acc, val_f1_score = valid_one_epoch(model, optimizer, valid_loader, device=CONFIG['device'], epoch=epoch)
-        history['Train Loss'].append(train_epoch_loss)
-        history['Valid Loss'].append(val_epoch_loss)
-        history['Valid Acc'].append(val_epoch_acc)
-        history['Valid F1 Score'].append(val_f1_score)
-        wandb.log({"Train Loss": train_epoch_loss})
-        wandb.log({"Valid Loss": val_epoch_loss})
-        wandb.log({"Valid Acc": val_epoch_acc})
-        wandb.log({"Valid F1 Score": val_f1_score})
-        print(f'Valid Acc: {val_epoch_acc}')
-        print(f'Valid F1 Score: {val_f1_score}')
-        if val_epoch_acc >= best_epoch_acc:
-            print(f"Validation Acc Improved ({best_epoch_acc} ---> {val_epoch_acc})")
-            best_epoch_acc = val_epoch_acc
-            run.summary["Best Accuracy"] = best_epoch_acc
-            best_model_wts = copy.deepcopy(model.state_dict())
-            if fold is None:
-                PATH = f"ACC{best_epoch_acc:.4f}_epoch{epoch:.0f}.bin"
-            else:
-                PATH = f"ACC{best_epoch_acc:.4f}_epoch{epoch:.0f}_fold{fold}.bin"
-            torch.save(model.state_dict(), PATH)
-            wandb.save(PATH)
-            print(f"Model Saved to {PATH}")
-        print()
+    savedir = os.path.join('Models', RUN_NAME)
+    if fold is not None:
+        savedir = os.path.join(savedir, f'fold{fold}')
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
+    checkpoint_callback = ModelCheckpoint(monitor='valid_acc', mode='max', save_last=True, verbose=True, dirpath=savedir)
+    trainer = pl.Trainer(
+        strategy = DDPStrategy(find_unused_parameters=False),
+        accelerator='gpu',
+        devices=CONFIG['num_gpus'],
+        max_epochs=CONFIG['epochs'],
+        callbacks=[checkpoint_callback],
+        precision=16,
+        amp_backend='native',
+        num_sanity_val_steps=0,
+        logger=wandb_logger,
+        log_every_n_steps=1,
+    )
+    trainer.fit(model, train_loader, valid_loader)
     end = time.time()
     time_elapsed = end - start
     print(f"Training complete in {time_elapsed // 3600:.0f}h {(time_elapsed % 3600) // 60:.0f}m {(time_elapsed % 3600) % 60:.0f}s")
-    print(f"Best ACC: {best_epoch_acc:.4f}")
-    model.load_state_dict(best_model_wts)
-    return model, history
 
 
-# WandB Initialization
-api_key = open('wandb_api_key.txt').readline()
-try:
-    wandb.login(key=api_key)
-    anony = None
-except:
-    anony = "must"
-    print('If you want to use your W&B account, go to Add-ons -> Secrets and provide your W&B access token. Use the Label name as wandb_api. \nGet your W&B access token from here: https://wandb.ai/authorize')
+def main():
+    # WandB Initialization
+    api_key = open('wandb_api_key.txt').readline()
+    try:
+        wandb.login(key=api_key)
+        anony = None
+    except:
+        anony = "must"
+        print('If you want to use your W&B account, go to Add-ons -> Secrets and provide your W&B access token. Use the Label name as wandb_api. \nGet your W&B access token from here: https://wandb.ai/authorize')
 
-# Read the data
-set_seed(CONFIG['seed'])
-df = pd.read_csv(f"{ROOT_DIR}train.csv")
-le = LabelEncoder()
-df.landmark_id = le.fit_transform(df.landmark_id)
-joblib.dump(le, 'label_encoder.pkl')
-df['file_path'] = df['id'].apply(get_train_file_path)
+    # Read the data
+    set_seed()
+    df = pd.read_csv(os.path.join(ROOT_DIR, 'train.csv'))
+    le = LabelEncoder()
+    df.landmark_id = le.fit_transform(df.landmark_id)
+    joblib.dump(le, 'label_encoder.pkl')
+    df['file_path'] = df['id'].apply(get_train_file_path)
 
-if "n_fold" in CONFIG:
-    # Stratified KFold cross-validation training
-    skf = StratifiedKFold(n_splits=CONFIG["n_fold"], shuffle=True, random_state=CONFIG['seed'])
-    for fold, (train_ids, test_ids) in enumerate(skf.split(df, df.landmark_id)):
-        run = wandb.init(project='Landmark Retrieval', config=CONFIG, job_type='Train', anonymous='must', group=RUN_NAME, name=f"fold{fold}_{RUN_NAME}")
-        train_loader, valid_loader = prepare_loaders(df.iloc[train_ids], df.iloc[test_ids], num_workers=NUM_GPUS)
-        model = LandmarkRetrievalModel(CONFIG['model_name'])
-        model.to(CONFIG['device'])
-        optimizer = optim.Adam(model.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'])
-        scheduler = fetch_scheduler(optimizer)
-        print(f"\n\nFold {fold}:")
-        model, history = run_training(model, optimizer, scheduler, train_loader, valid_loader, fold)
-        run.finish()
-else:
-    # Simple cross-validation training
-    run = wandb.init(project='Landmark Retrieval', config=CONFIG, job_type='Train', anonymous='must', group=RUN_NAME, name=RUN_NAME)
-    df_train, df_valid = train_test_split(df, test_size=CONFIG['dev_size'], stratify=df.landmark_id, shuffle=True, random_state=CONFIG['seed'])
-    train_loader, valid_loader = prepare_loaders(df_train, df_valid, num_workers=NUM_GPUS)
-    model = LandmarkRetrievalModel(CONFIG['model_name'])
-    model.to(CONFIG['device'])
-    optimizer = optim.Adam(model.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'])
-    scheduler = fetch_scheduler(optimizer)
-    model, history = run_training(model, optimizer, scheduler, train_loader, valid_loader)
-    run.finish()
+    # Train the model
+    if "n_fold" in CONFIG:
+        # Stratified KFold cross-validation training
+        skf = StratifiedKFold(n_splits=CONFIG["n_fold"], shuffle=True, random_state=CONFIG['seed'])
+        for fold, (train_ids, test_ids) in enumerate(skf.split(df, df.landmark_id)):
+            wandb_logger = WandbLogger(project='Landmark Retrieval', config=CONFIG, job_type='Train', anonymous=anony, group=RUN_NAME, name=f"fold{fold}_{RUN_NAME}", log_model=True)
+            train_loader, valid_loader = prepare_loaders(df.iloc[train_ids], df.iloc[test_ids])
+            model = LandmarkRetrievalModel()
+            print(f"\n\nFold {fold}:")
+            run_training(model, train_loader, valid_loader, wandb_logger, fold)
+            wandb.finish()
+    else:
+        # Simple cross-validation training
+        wandb_logger = WandbLogger(project='Landmark Retrieval', config=CONFIG, job_type='Train', anonymous=anony, group=RUN_NAME, name=RUN_NAME, log_model=True)
+        df_train, df_valid = train_test_split(df, test_size=CONFIG['valid_size'], stratify=df.landmark_id, shuffle=True, random_state=CONFIG['seed'])
+        train_loader, valid_loader = prepare_loaders(df_train, df_valid)
+        model = LandmarkRetrievalModel()
+        run_training(model, train_loader, valid_loader, wandb_logger)
+        wandb.finish()
+
+
+if __name__ == '__main__':
+    main()
